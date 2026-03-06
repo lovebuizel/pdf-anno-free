@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>一鍵移除 PDF 註釋</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap');
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      color: #e8e8e8;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    
+    .container {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 3rem;
+      max-width: 500px;
+      width: 100%;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    }
+    
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(90deg, #e94560, #ff6b6b);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .subtitle {
+      font-size: 0.9rem;
+      color: #a0a0a0;
+      margin-bottom: 2rem;
+    }
+    
+    .upload-zone {
+      border: 2px dashed rgba(233, 69, 96, 0.5);
+      border-radius: 16px;
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: rgba(233, 69, 96, 0.05);
+    }
+    
+    .upload-zone:hover {
+      border-color: #e94560;
+      background: rgba(233, 69, 96, 0.1);
+    }
+    
+    .upload-zone.dragover {
+      border-color: #e94560;
+      background: rgba(233, 69, 96, 0.15);
+    }
+    
+    .upload-zone input {
+      display: none;
+    }
+    
+    .upload-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      opacity: 0.8;
+    }
+    
+    .upload-text {
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    
+    .upload-hint {
+      font-size: 0.8rem;
+      color: #888;
+    }
+    
+    .btn {
+      width: 100%;
+      padding: 1rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 500;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-family: inherit;
+      margin-top: 1.5rem;
+    }
+    
+    .btn-primary {
+      background: linear-gradient(135deg, #e94560, #ff6b6b);
+      color: white;
+    }
+    
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 10px 25px rgba(233, 69, 96, 0.4);
+    }
+    
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .btn-download {
+      background: linear-gradient(135deg, #0f3460, #1a1a2e);
+      color: #e94560;
+      border: 2px solid #e94560;
+    }
+    
+    .btn-download:hover {
+      background: rgba(233, 69, 96, 0.2);
+      transform: translateY(-2px);
+    }
+    
+    .status {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      display: none;
+    }
+    
+    .status.success {
+      display: block;
+      background: rgba(46, 213, 115, 0.2);
+      border: 1px solid rgba(46, 213, 115, 0.5);
+      color: #2ed573;
+    }
+    
+    .status.error {
+      display: block;
+      background: rgba(255, 71, 87, 0.2);
+      border: 1px solid rgba(255, 71, 87, 0.5);
+      color: #ff4757;
+    }
+    
+    .status.processing {
+      display: block;
+      background: rgba(255, 193, 7, 0.2);
+      border: 1px solid rgba(255, 193, 7, 0.5);
+      color: #ffc107;
+    }
+    
+    .file-name {
+      margin-top: 1rem;
+      font-size: 0.85rem;
+      color: #a0a0a0;
+      word-break: break-all;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>一鍵移除 PDF 註釋</h1>
+    <p class="subtitle">拖曳或選擇 PDF，立即取得乾淨版本</p>
+    
+    <div class="upload-zone" id="uploadZone">
+      <input type="file" id="fileInput" accept=".pdf,application/pdf">
+      <div class="upload-icon">📄</div>
+      <div class="upload-text">點擊或拖曳 PDF 檔案到這裡</div>
+      <div class="upload-hint">僅支援 PDF 格式</div>
+    </div>
+    
+    <div class="file-name" id="fileName"></div>
+    
+    <button class="btn btn-primary" id="processBtn" disabled>
+      移除註釋並下載
+    </button>
+    
+    <div class="status" id="status"></div>
+  </div>
+
+  <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script>
+    const uploadZone = document.getElementById('uploadZone');
+    const fileInput = document.getElementById('fileInput');
+    const processBtn = document.getElementById('processBtn');
+    const status = document.getElementById('status');
+    const fileName = document.getElementById('fileName');
+
+    let selectedFile = null;
+
+    function showStatus(message, type) {
+      status.textContent = message;
+      status.className = 'status ' + type;
+    }
+
+    function hideStatus() {
+      status.className = 'status';
+      status.style.display = 'none';
+    }
+
+    uploadZone.addEventListener('click', () => fileInput.click());
+
+    uploadZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadZone.classList.add('dragover');
+    });
+
+    uploadZone.addEventListener('dragleave', () => {
+      uploadZone.classList.remove('dragover');
+    });
+
+    uploadZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadZone.classList.remove('dragover');
+      const files = e.dataTransfer.files;
+      if (files.length > 0 && files[0].type === 'application/pdf') {
+        handleFile(files[0]);
+      } else {
+        showStatus('請上傳 PDF 格式的檔案', 'error');
+      }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        if (file.type === 'application/pdf') {
+          handleFile(file);
+        } else {
+          showStatus('請上傳 PDF 格式的檔案', 'error');
+        }
+      }
+    });
+
+    function handleFile(file) {
+      selectedFile = file;
+      fileName.textContent = '已選擇：' + file.name;
+      processBtn.disabled = false;
+      hideStatus();
+    }
+
+    function removeAnnotations(pdfDoc, pdfLib) {
+      const PDFName = pdfLib.PDFName;
+      const pages = pdfDoc.getPages();
+
+      for (const page of pages) {
+        try {
+          const annots = page.node.Annots();
+          if (annots) {
+            const size = annots.size ? annots.size() : 0;
+            if (size > 0) {
+              for (let i = size - 1; i >= 0; i--) {
+                try {
+                  const annot = annots.get(i);
+                  if (annot && annots.context) {
+                    annots.context.delete(annot);
+                  }
+                } catch (e) {
+                  // 單一註釋可能是 PDFDict，改用刪除整個 Annots 鍵
+                  break;
+                }
+              }
+            }
+          }
+        } catch (e) {
+          // Annots 可能是 PDFDict 或結構異常，直接刪除 Annots 鍵
+        }
+        try {
+          page.node.dict.delete(PDFName.of('Annots'));
+        } catch (e) {
+          // 若刪除失敗，嘗試設為空陣列（某些 PDF 結構需要）
+          try {
+            const emptyAnnots = pdfDoc.context.obj([]);
+            page.node.dict.set(PDFName.of('Annots'), emptyAnnots);
+          } catch (e2) {}
+        }
+      }
+
+      // 移除文件層級的 AcroForm 註釋參考
+      try {
+        const catalog = pdfDoc.catalog;
+        if (catalog && catalog.get(PDFName.of('AcroForm'))) {
+          catalog.delete(PDFName.of('AcroForm'));
+        }
+      } catch (e) {}
+    }
+
+    processBtn.addEventListener('click', async () => {
+      if (!selectedFile) return;
+
+      processBtn.disabled = true;
+      showStatus('正在處理 PDF...', 'processing');
+
+      try {
+        const arrayBuffer = await selectedFile.arrayBuffer();
+        const pdfLib = window.PDFLib || window.pdfLib;
+        const pdfDoc = await pdfLib.PDFDocument.load(arrayBuffer);
+
+        removeAnnotations(pdfDoc, pdfLib);
+
+        const pdfBytes = await pdfDoc.save();
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = selectedFile.name.replace(/\.pdf$/i, '-無註釋.pdf');
+        a.click();
+        URL.revokeObjectURL(url);
+
+        showStatus('✓ 註釋已移除，檔案已開始下載', 'success');
+        processBtn.disabled = false;
+      } catch (error) {
+        console.error(error);
+        showStatus('處理失敗：' + (error.message || '未知錯誤'), 'error');
+        processBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
