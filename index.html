@@ -4,6 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>一鍵移除 PDF 註釋</title>
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-QFMBFBRD2D"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-QFMBFBRD2D');
+  </script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap');
     
@@ -316,6 +325,9 @@
         a.download = selectedFile.name.replace(/\.pdf$/i, '-無註釋.pdf');
         a.click();
         URL.revokeObjectURL(url);
+        if (typeof gtag === 'function') {
+          gtag('event', 'file_download', { event_category: 'engagement', event_label: 'pdf_annotation_removed' });
+        }
 
         showStatus('✓ 註釋已移除，檔案已開始下載', 'success');
         processBtn.disabled = false;
